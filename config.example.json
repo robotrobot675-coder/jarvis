@@ -1,0 +1,5 @@
+{
+  "ai_provider": "groq",
+  "api_key": "your-api-key-here",
+  "model": "llama-3.1-8b-instant"
+}

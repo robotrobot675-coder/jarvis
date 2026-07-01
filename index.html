@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS — Gesture Controlled AI Assistant</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🤖</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ─── Welcome Screen ─── -->
+<div id="welcome-screen">
+  <div class="welcome-logo">JARVIS</div>
+  <div class="welcome-sub">Gesture Controlled AI Assistant</div>
+  <button class="welcome-btn" id="launch-btn">Launch Jarvis</button>
+  <div class="welcome-hint">
+    Uses your camera for hand gesture control<br>
+    <kbd>Show 1-5 fingers</kbd> &middot; <kbd>Fist to silence</kbd> &middot; <kbd>Open palm for voice</kbd>
+  </div>
+</div>
+
+<!-- ─── App ─── -->
+<div id="app">
+  <div class="app-container">
+    <header>
+      <div class="logo">JARVIS</div>
+      <div class="status-bar">
+        <span id="status-text">Initializing...</span>
+        <span id="hand-status" class="hand-status">No hand</span>
+        <button id="settings-btn" class="settings-btn" title="AI Settings">&#9881;</button>
+      </div>
+    </header>
+
+    <div id="camera-section">
+      <video id="webcam" autoplay playsinline muted></video>
+      <canvas id="gesture-canvas"></canvas>
+      <div id="gesture-overlay">
+        <div id="gesture-name">--</div>
+        <div id="finger-count">Show your hand</div>
+      </div>
+    </div>
+
+    <div id="chat-section">
+      <div id="chat-log">
+        <div class="message system">Welcome to Jarvis. Launch camera and show a hand gesture to begin.</div>
+      </div>
+      <div id="input-area">
+        <input type="text" id="text-input" placeholder="Type a command..." />
+        <button id="send-btn">Send</button>
+        <button id="voice-btn" title="Voice input">&#127908;</button>
+      </div>
+    </div>
+
+    <div id="info-panel">
+      <h3>AI Status</h3>
+      <div class="ai-status">
+        <div class="ai-indicator" id="ai-dot"></div>
+        <span id="ai-status-text">Checking...</span>
+      </div>
+      <h3>Gesture Guide</h3>
+      <div id="gesture-guide">
+        <div class="guide-item"><span class="gesture-icon">&#9757;</span><span class="gesture-label">1 Finger</span><span class="gesture-action">Greeting</span></div>
+        <div class="guide-item"><span class="gesture-icon">&#9996;</span><span class="gesture-label">2 Fingers</span><span class="gesture-action">Tell Time</span></div>
+        <div class="guide-item"><span class="gesture-icon">&#129304;</span><span class="gesture-label">3 Fingers</span><span class="gesture-action">Tell Date</span></div>
+        <div class="guide-item"><span class="gesture-icon">&#129306;</span><span class="gesture-label">4 Fingers</span><span class="gesture-action">Weather</span></div>
+        <div class="guide-item"><span class="gesture-icon">&#128406;</span><span class="gesture-label">5 Fingers</span><span class="gesture-action">AI Search</span></div>
+        <div class="guide-item"><span class="gesture-icon">&#9994;</span><span class="gesture-label">Fist</span><span class="gesture-action">Silence</span></div>
+        <div class="guide-item"><span class="gesture-icon">&#128073;</span><span class="gesture-label">Swipe Right</span><span class="gesture-action">Next</span></div>
+        <div class="guide-item"><span class="gesture-icon">&#128072;</span><span class="gesture-label">Swipe Left</span><span class="gesture-action">Back</span></div>
+        <div class="guide-item"><span class="gesture-icon">&#128077;</span><span class="gesture-label">Thumbs Up</span><span class="gesture-action">Joke</span></div>
+        <div class="guide-item"><span class="gesture-icon">&#128400;</span><span class="gesture-label">Open Palm</span><span class="gesture-action">Voice Mode</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Settings Modal ─── -->
+<div id="settings-modal" class="modal" style="display:none">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>AI Settings</h3>
+      <button id="modal-close" class="modal-close">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="setting-group">
+        <label>AI Provider</label>
+        <select id="ai-provider">
+          <option value="groq">Groq (Fast — Free Tier)</option>
+          <option value="openai">OpenAI (GPT-4o mini)</option>
+          <option value="gemini">Google Gemini</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label>API Key</label>
+        <input type="password" id="api-key" placeholder="Enter your API key" />
+        <small>Get a free key from <a href="https://console.groq.com" target="_blank">console.groq.com</a></small>
+      </div>
+      <div class="setting-group">
+        <label>Model (optional)</label>
+        <input type="text" id="ai-model" placeholder="llama3-8b-8192" />
+      </div>
+      <div class="setting-group" style="flex-direction:row;align-items:center">
+        <button id="save-settings" class="save-btn">Save &amp; Test</button>
+        <span id="settings-status"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.1.0/dist/handpose.min.js"></script>
+  <script src="app.js?v=20260702"></script>
+</body>
+</html>
