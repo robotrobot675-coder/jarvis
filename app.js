@@ -403,11 +403,44 @@ function updateAIStatus(status, text) {
   dom.aiStatusText.textContent = text;
 }
 
+async function queryGroqDirect(prompt) {
+  const apiKey = localStorage.getItem('groq_api_key');
+  const model = localStorage.getItem('groq_model') || 'llama-3.1-8b-instant';
+  if (!apiKey) return null;
+  try {
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: 'You are Jarvis, a smart AI assistant. Respond in English concisely.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 500,
+        temperature: 0.7
+      })
+    });
+    const data = await resp.json();
+    return data.choices[0].message.content;
+  } catch {
+    return null;
+  }
+}
+
 async function initAI() {
+  const localKey = localStorage.getItem('groq_api_key');
+  if (localKey) {
+    state.ai.ready = true;
+    state.ai.localMode = true;
+    updateAIStatus('ready', 'AI: groq (browser)');
+    return;
+  }
   const status = await checkBackendStatus();
   if (status && status.has_key) {
     state.ai.ready = true;
-    updateAIStatus('ready', `AI: ${status.provider}`);
+    state.ai.localMode = false;
+    updateAIStatus('ready', 'AI: ' + status.provider);
   } else {
     state.ai.ready = false;
     updateAIStatus('error', 'Set API key in Settings');
@@ -417,15 +450,26 @@ async function initAI() {
 async function processWithBackend(command) {
   updateStatus('Thinking...');
   addSystem('Processing...');
+
   const response = await sendToBackend(command);
   if (response) {
     speak(response);
     addMessage(response, 'jarvis');
-  } else {
-    const fallback = 'Backend not responding. Check if the server is running.';
-    speak(fallback);
-    addMessage(fallback, 'jarvis');
+    updateStatus('Waiting for gesture...');
+    return;
   }
+
+  const groqResp = await queryGroqDirect(command);
+  if (groqResp) {
+    speak(groqResp);
+    addMessage(groqResp, 'jarvis');
+    updateStatus('Waiting for gesture...');
+    return;
+  }
+
+  const fallback = 'Backend not responding and no API key set. Configure AI in settings.';
+  speak(fallback);
+  addMessage(fallback, 'jarvis');
   updateStatus('Waiting for gesture...');
 }
 
@@ -803,11 +847,15 @@ function setupSettings() {
 
   openBtn.onclick = async () => {
     modal.style.display = 'flex';
+    const localKey = localStorage.getItem('groq_api_key');
+    const localModel = localStorage.getItem('groq_model');
+    document.getElementById('api-key').value = localKey || '';
+    document.getElementById('ai-model').value = localModel || 'llama-3.1-8b-instant';
+    document.getElementById('ai-provider').value = 'groq';
     const cfg = await loadConfig();
-    if (cfg) {
-      document.getElementById('ai-provider').value = cfg.ai_provider || 'groq';
-      document.getElementById('api-key').value = cfg.api_key || '';
-      document.getElementById('ai-model').value = cfg.model || '';
+    if (cfg && cfg.api_key && !localKey) {
+      document.getElementById('api-key').value = cfg.api_key;
+      document.getElementById('ai-model').value = cfg.model || cfg.api_key ? 'llama-3.1-8b-instant' : '';
     }
   };
 
@@ -823,8 +871,12 @@ function setupSettings() {
     saveBtn.textContent = 'Saving...';
     saveBtn.disabled = true;
     statusEl.textContent = '';
+    // Save to localStorage for phone use
+    if (config.api_key) localStorage.setItem('groq_api_key', config.api_key);
+    if (config.model) localStorage.setItem('groq_model', config.model);
+    // Also try backend
     const result = await saveConfig(config);
-    if (result) {
+    if (result || config.api_key) {
       statusEl.style.color = '#22c55e';
       statusEl.textContent = 'Saved! Testing...';
       await initAI();
@@ -836,9 +888,13 @@ function setupSettings() {
       }, 500);
     } else {
       statusEl.style.color = '#ef4444';
-      statusEl.textContent = 'Failed to save';
-      saveBtn.textContent = 'Save & Test';
-      saveBtn.disabled = false;
+      statusEl.textContent = 'Saved locally (no backend)';
+      await initAI();
+      setTimeout(() => {
+        saveBtn.textContent = 'Save & Test';
+        saveBtn.disabled = false;
+        setTimeout(() => { statusEl.textContent = ''; modal.style.display = 'none'; }, 1000);
+      }, 500);
     }
   };
 }
