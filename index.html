@@ -395,6 +395,15 @@ header::before {
 .save-btn:hover { transform:scale(1.02); box-shadow:0 0 25px rgba(0,240,255,0.3); }
 .save-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; box-shadow:none; }
 #settings-status { font-size:12px; margin-left:12px; }
+.personal-section { margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+.personal-section h4 { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:8px; }
+.qa-pair { display:grid; grid-template-columns:1fr 1fr auto; gap:6px; margin-bottom:6px; align-items:center; }
+.qa-pair input { padding:6px 8px; border:1px solid rgba(148,163,184,0.15); border-radius:6px; background:rgba(15,23,42,0.5); color:var(--text); font-size:11px; outline:none; }
+.qa-pair input:focus { border-color:var(--cyan); }
+.qa-del { width:24px;height:24px;border:none;border-radius:4px;background:rgba(239,68,68,0.2);color:var(--red);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center; }
+.qa-del:hover { background:rgba(239,68,68,0.4); }
+.qa-add { padding:6px 12px; border:none; border-radius:6px; background:rgba(0,240,255,0.1); color:var(--cyan); font-size:11px; cursor:pointer; margin-top:4px; }
+.qa-add:hover { background:rgba(0,240,255,0.2); }
 </style>
 </head>
 <body>
@@ -486,6 +495,11 @@ header::before {
       <div class="setting-group">
         <label>Model (optional)</label>
         <input type="text" id="ai-model" placeholder="llama3-8b-8192" />
+      </div>
+      <div class="personal-section">
+        <h4>Personal Q&amp;A</h4>
+        <div id="qa-list"></div>
+        <button class="qa-add" id="qa-add-btn">+ Add Question</button>
       </div>
       <div class="setting-group" style="flex-direction:row;align-items:center">
         <button id="save-settings" class="save-btn">Save &amp; Test</button>
@@ -671,6 +685,13 @@ async function fetchJoke() {
   } catch { const j='Why do programmers prefer dark mode? Because light attracts bugs!'; speak(j); addMessage(j,'jarvis'); }
 }
 
+function loadPersonalQA() {
+  try { return JSON.parse(localStorage.getItem('jarvis_personal_qa')) || []; } catch { return []; }
+}
+function savePersonalQA(pairs) {
+  localStorage.setItem('jarvis_personal_qa', JSON.stringify(pairs));
+}
+
 function updateAIStatus(status, text) {
   dom.aiDot.className = `ai-indicator ${status}`;
   dom.aiStatusText.textContent = text;
@@ -762,6 +783,8 @@ async function processVoiceCommand(command) {
     if (lower.includes('stop')||lower.includes('silence')||lower.includes('shut up')||lower.includes('chup')||lower.includes('bas')) { cancelSpeech();return; }
     if (/^(open|launch|start)\s+/i.test(command)) { await processWithAI(command); return; }
     if (/kholo|khol|khole|khol do|khol de|kholi/i.test(command)) { const app=command.replace(/kholo|khol|khole|khol do|khol de|kholi/gi,'').trim(); if(app) { await processWithAI(`open ${app}`); return; } }
+    const personal = checkPersonalQA(lower);
+    if (personal) { speak(personal); addMessage(personal,'jarvis'); return; }
     await processWithAI(command);
   } finally { state.isProcessing = false; }
 }
@@ -856,6 +879,32 @@ function handleTextInput() {
   processVoiceCommand(text);
 }
 
+function renderQAEditor() {
+  const container = document.getElementById('qa-list');
+  const pairs = loadPersonalQA();
+  container.innerHTML = '';
+  pairs.forEach((pair, i) => {
+    const div = document.createElement('div');
+    div.className = 'qa-pair';
+    div.innerHTML = `<input class="qa-q" value="${pair.q.replace(/"/g,'&quot;')}" placeholder="Question..." /><input class="qa-a" value="${pair.a.replace(/"/g,'&quot;')}" placeholder="Answer..." /><button class="qa-del" data-i="${i}">✕</button>`;
+    div.querySelector('.qa-del').onclick = () => { pairs.splice(i,1); savePersonalQA(pairs); renderQAEditor(); };
+    container.appendChild(div);
+  });
+  document.getElementById('qa-add-btn').onclick = () => {
+    pairs.push({q:'',a:''}); savePersonalQA(pairs); renderQAEditor();
+    const inputs = container.querySelectorAll('.qa-pair:last-child input');
+    if (inputs.length) inputs[0].focus();
+  };
+}
+function checkPersonalQA(lower) {
+  const pairs = loadPersonalQA();
+  for (const p of pairs) {
+    if (!p.q || !p.a) continue;
+    if (lower.includes(p.q.toLowerCase())) return p.a;
+  }
+  return null;
+}
+
 function setupSettings() {
   const modal = document.getElementById('settings-modal');
   const openBtn = document.getElementById('settings-btn');
@@ -867,12 +916,20 @@ function setupSettings() {
     document.getElementById('api-key').value = localStorage.getItem('groq_api_key') || '';
     document.getElementById('ai-model').value = localStorage.getItem('groq_model') || 'llama-3.1-8b-instant';
     document.getElementById('ai-provider').value = 'groq';
+    renderQAEditor();
   };
   closeBtn.onclick = () => { modal.style.display = 'none'; };
   modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
   saveBtn.onclick = async () => {
     const apiKey = document.getElementById('api-key').value.trim();
     const model = document.getElementById('ai-model').value.trim();
+    const qaPairs = [];
+    document.querySelectorAll('.qa-pair').forEach(el => {
+      const q = el.querySelector('.qa-q').value.trim();
+      const a = el.querySelector('.qa-a').value.trim();
+      if (q && a) qaPairs.push({q,a});
+    });
+    savePersonalQA(qaPairs);
     saveBtn.textContent = 'Saving...'; saveBtn.disabled = true; statusEl.textContent = '';
     if (apiKey) localStorage.setItem('groq_api_key', apiKey);
     if (model) localStorage.setItem('groq_model', model);
