@@ -404,6 +404,19 @@ header::before {
 .qa-del:hover { background:rgba(239,68,68,0.4); }
 .qa-add { padding:6px 12px; border:none; border-radius:6px; background:rgba(0,240,255,0.1); color:var(--cyan); font-size:11px; cursor:pointer; margin-top:4px; }
 .qa-add:hover { background:rgba(0,240,255,0.2); }
+.fullscreen-btn {
+  position:absolute; top:8px; right:8px; z-index:10;
+  width:32px; height:32px; border:none; border-radius:8px;
+  background:rgba(0,0,0,0.5); color:rgba(255,255,255,0.7); font-size:14px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:all 0.3s; backdrop-filter:blur(4px);
+}
+.fullscreen-btn:hover { background:rgba(0,240,255,0.2); color:var(--cyan); }
+#camera-section.fullscreen {
+  position:fixed; inset:0; z-index:998; aspect-ratio:auto;
+  border-radius:0; background:#000;
+}
+#camera-section.fullscreen video, #camera-section.fullscreen canvas { border-radius:0; }
 </style>
 </head>
 <body>
@@ -432,6 +445,7 @@ header::before {
     <div id="camera-section">
       <video id="webcam" autoplay playsinline muted></video>
       <canvas id="gesture-canvas"></canvas>
+      <button id="fullscreen-btn" class="fullscreen-btn" title="Fullscreen">&#9974;</button>
       <div id="gesture-overlay">
         <div id="gesture-name">--</div>
         <div id="finger-count">Show your hand</div>
@@ -527,8 +541,9 @@ const state = {
 };
 
 const CONFIG = {
-  GESTURE_STABILITY: 8, GESTURE_COOLDOWN: 50,
-  SWIPE_THRESHOLD: 0.012, SWIPE_FRAMES: 8,
+  GESTURE_STABILITY: 5, GESTURE_COOLDOWN: 30,
+  HAND_CONFIDENCE: 0.75, HAND_MIN_AREA: 4000, HAND_MIN_SIDE: 40,
+  SWIPE_THRESHOLD: 0.008, SWIPE_FRAMES: 6,
   SPEECH_RATE: 1.0, SPEECH_PITCH: 1.1,
 };
 
@@ -548,6 +563,7 @@ function initDOM() {
   dom.textInput = document.getElementById('text-input');
   dom.sendBtn = document.getElementById('send-btn');
   dom.voiceBtn = document.getElementById('voice-btn');
+  dom.fullscreenBtn = document.getElementById('fullscreen-btn');
   dom.aiDot = document.getElementById('ai-dot');
   dom.aiStatusText = document.getElementById('ai-status-text');
 }
@@ -835,7 +851,7 @@ function processPredictions(predictions) {
     const confidence = hand.handInViewConfidence;
     const box = hand.boundingBox;
     const boxW = box.bottomRight[0] - box.topLeft[0], boxH = box.bottomRight[1] - box.topLeft[1];
-    if (confidence >= 0.85 && (boxW * boxH) > 8000 && boxW > 60 && boxH > 60) validHand = true;
+    if (confidence >= CONFIG.HAND_CONFIDENCE && (boxW * boxH) > CONFIG.HAND_MIN_AREA && boxW > CONFIG.HAND_MIN_SIDE && boxH > CONFIG.HAND_MIN_SIDE) validHand = true;
   }
   state.handStable = validHand ? Math.min(state.handStable + 1, 10) : 0;
   state.handDetected = state.handStable >= 3;
@@ -868,6 +884,17 @@ function drawLandmarks(landmarks) {
   ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2;
   for (const [i,j] of connections) { if (landmarks[i]&&landmarks[j]) { ctx.beginPath(); ctx.moveTo(landmarks[i][0]*w,landmarks[i][1]*h); ctx.lineTo(landmarks[j][0]*w,landmarks[j][1]*h); ctx.stroke(); } }
   for (const lm of landmarks) { ctx.beginPath(); ctx.arc(lm[0]*w,lm[1]*h,4,0,2*Math.PI); ctx.fillStyle='#00d4ff'; ctx.fill(); ctx.strokeStyle='#ffffff'; ctx.lineWidth=1; ctx.stroke(); }
+}
+
+function toggleFullscreen() {
+  const el = document.getElementById('camera-section');
+  if (el.classList.contains('fullscreen')) {
+    el.classList.remove('fullscreen');
+    dom.fullscreenBtn.innerHTML = '&#9974;';
+  } else {
+    el.classList.add('fullscreen');
+    dom.fullscreenBtn.innerHTML = '&#10006;';
+  }
 }
 
 function updateStatus(text) { dom.statusText.textContent = text; }
@@ -945,6 +972,7 @@ function init() {
   dom.sendBtn.addEventListener('click', handleTextInput);
   dom.textInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleTextInput(); });
   dom.voiceBtn.addEventListener('click', startVoiceRecognition);
+  dom.fullscreenBtn.addEventListener('click', toggleFullscreen);
 }
 
 window.addEventListener('DOMContentLoaded', init);
